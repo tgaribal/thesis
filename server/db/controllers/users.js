@@ -1,7 +1,8 @@
 var db = require('../config/db');
 var bcrypt = require('bcrypt');
+var Promise = require('bluebird');
 
-exports.createUser = function(email, password, first_name, last_name, callback) {
+exports.createUser = Promise.promisify(function(email, password, first_name, last_name, callback) {
   db.query({
     text: 'SELECT email, password, first_name, last_name FROM users \
       WHERE email = \'' + email + '\';'
@@ -10,41 +11,36 @@ exports.createUser = function(email, password, first_name, last_name, callback) 
     if (err) {
       console.log(err);
     } else if (rows.rowCount > 0) {
-      console.log('user already exists', rows.rows);
-      callback('user already exists');
+      callback(null, false);
     } else {
-      console.log('found nothing');
       bcrypt.hash(password, 10, function(err, hash) {
-        // Store hash in your password DB. 
-        console.log('hash', hash);
         db.query({
           text: 'INSERT INTO users(email, password, first_name, last_name) \
             VALUES($1, $2, $3, $4)',
           values: [email, hash, first_name, last_name]
         },
-
         function(err, result) {
           if (err) {
-            console.log('ERROR IN THE INSERT', err);
+            callback(err, null);
           } else {
-            callback('success');
+            callback(null, true);
           }
         });
       });
     }
   });
-};
+});
 
 exports.loginUser = function(email, password, callback) {
   db.query({
     text: 'SELECT email, password FROM users \
       WHERE email = \'' + email + '\';'
   }, 
-  function(err, rows) {
+  function(err, results) {
     if (err) {
       console.log(err);
-    } else if (rows.rowCount > 0) {
-      bcrypt.compare(password, rows.rows[0].password, function(err, res) {
+    } else if (results.rowCount > 0) {
+      bcrypt.compare(password, results.rows[0].password, function(err, res) {
           // res == true 
           if (err) {console.log(err);}
           if (res) {
@@ -74,7 +70,6 @@ exports.updateUser = function(email, updateFields, callback) {
     }
   }
   updateString = updateString.slice(0, updateString.length - 2);
-  // console.log('update string', updateString);
   console.log('UPDATE users SET ' + updateString + ' \
       WHERE email = \'' + email + '\';');
   db.query({
@@ -100,11 +95,11 @@ exports.getUserFields = function(email, callback) {
   db.query({
     text: queryString
   }, 
-  function(err, rows) {
+  function(err, results) {
     if (err) {
       callback(err, null);
-    } else if (rows.rowCount > 0) {
-      callback(null, rows.rows);
+    } else if (results.rowCount > 0) {
+      callback(null, results.rows);
     } else {
       callback('no rows for user ' + email, null);
     }
@@ -112,9 +107,10 @@ exports.getUserFields = function(email, callback) {
 }
 
 //EXAMPLE USAGE:
-// exports.createUser('herbert@gmail.com', 'test', 'Herbert', 'Williams', function(response) {
-//   console.log(response);
-// });
+// exports.createUser('a@gmail.com', 'test', 'asdf', 'fds')
+//   .then(function() {
+//     exports.createUser('b@gmail.com', 'test', 'wersf', 'asdbfg');
+//   });
 
 // exports.loginUser('herbert@gmail.com', 'test', function(response) {
 //   console.log(response);

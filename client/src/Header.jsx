@@ -1,9 +1,9 @@
 import React, { Component } from 'react';
 import axios from 'axios';
 import { Button, Modal, FormGroup, ControlLabel, FormControl } from 'react-bootstrap';
-import { Link } from 'react-router';
+import { Link, browserHistory } from 'react-router';
 
-import logo from './logo.svg';
+import logo from '../assets/images/[AddUp++]Logo.png';
 import FaUser from 'react-icons/lib/fa/user';
 
 const FieldGroup = ({ id, label, ...props }) => {
@@ -23,6 +23,7 @@ class Header extends Component {
       showSignupModal: false,
       showLogoutModal: false,
       loggedIn: false,
+      validationError: false,
       email: '',
       password: '',
       firstname: '',
@@ -45,14 +46,29 @@ class Header extends Component {
     this.onLastnameChange = this.onLastnameChange.bind(this)
   }
 
+  componentWillMount() {
+    axios.get('http://localhost:8080/userSession')
+    .then((res) => {
+      this.setState({
+        email: res.data.email || '',
+        firstname: res.data.firstName || '',
+        lastname: res.data.lastName || '',
+        loggedIn: (res.data.email) || false
+      });
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+  }
+
   closeLogin() {
-    this.setState({ showLoginModal: false });
+    this.setState({ showLoginModal: false, validationError: false });
   }
   openLogin() {
     this.setState({ showLoginModal: true });
   }
   closeSignup() {
-    this.setState({ showSignupModal: false });
+    this.setState({ showSignupModal: false, validationError: false });
   }
   openSignup() {
     this.setState({ showSignupModal: true });
@@ -78,15 +94,26 @@ class Header extends Component {
       password: this.state.password,
       firstname: this.state.firstname,
       lastname: this.state.lastname,
-      loggedIn: true
     })
     .then((res) => {
-      this.closeSignup();
+      if (res.data) { 
+        this.setState({
+          loggedIn: true
+        });
+        this.closeSignup();
+        browserHistory.push('/user');
+      } else {
+        this.setState({
+          validationError: true
+        });
+      }
     })
     .catch((err) => {
       console.log(err);
     });
   }
+
+
 
   loginUser (e) {
     e.preventDefault();
@@ -95,13 +122,20 @@ class Header extends Component {
       password: this.state.password
     })
     .then((res) => {
-      this.setState({
-        email: res.data.email,
-        firstname: res.data.first_name,
-        lastname: res.data.last_name,
-        loggedIn: true
-      })
-      this.closeLogin();
+      if (res.data) {
+        this.setState({
+          email: res.data.email,
+          firstname: res.data.first_name,
+          lastname: res.data.last_name,
+          loggedIn: true
+        });
+        this.closeLogin();
+        browserHistory.push('/user');
+      } else {
+        this.setState({
+          validationError: true
+        });
+      }
     })
     .catch((err) => {
       console.log(err);
@@ -109,14 +143,21 @@ class Header extends Component {
   }
 
   logoutUser () {
-    this.setState({
-      loggedIn: false,
-      email: '',
-      password: '',
-      firstname: '',
-      lastname: ''
+    axios.get('http://localhost:8080/logout')
+    .then((res) => {
+      console.log(res);
+      this.setState({
+        loggedIn: false,
+        email: '',
+        password: '',
+        firstname: '',
+        lastname: ''
+      });
+      this.closeLogout();
     })
-    this.closeLogout();
+    .catch((err) => {
+      console.log(err);
+    });
   }
 
   onPasswordChange (e) {
@@ -135,21 +176,18 @@ class Header extends Component {
     this.setState({lastname: e.target.value})
   }
 
-  componentDidMount () {
-    
-  }
-
   render() {
     return (
       <header>
         <div className="App-header">
-          <Link to="/">
+          <Link to="/" className="logo">
             <img src={logo} className="App-logo" alt="logo" />
             <div className="name">AddUp+</div>
           </Link>
 
           <div className="userButtons">
-            {this.state.loggedIn ? <Link to="/user"><div className="userProfileLink"><FaUser className="userIcon"/> Hello, {this.state.firstname}!</div></Link> : null}
+            {this.state.loggedIn ? <Link to="/user"><span className="userProfileLink"><FaUser className="userIcon"/> Hello, {this.state.firstname}!</span></Link> : null}
+            <Button className="navButton" bsSize="small" href="/search"><div className="searchLink">Search</div></Button>
             {this.state.loggedIn ? <Button className="logoutButton" bsSize="small" onClick={this.openLogout}>Logout</Button> : null}
             {this.state.loggedIn ? null : <Button className="loginButton" bsSize="small" onClick={this.openLogin}>Login</Button>}
             {this.state.loggedIn ? null : <Button className="signupButton" bsSize="small" onClick={this.openSignup}>Sign Up</Button>} 
@@ -198,6 +236,9 @@ class Header extends Component {
                 placeholder="Password*"
                 onChange={this.onPasswordChange}
               />
+              {
+                this.state.validationError ? <div className='error'>Email already registered</div> : null
+              }
               <Button
                 className="modalButton"
                 type="submit"
@@ -235,6 +276,9 @@ class Header extends Component {
                 placeholder="Password"
                 onChange={this.onPasswordChange}
               />
+              {
+                this.state.validationError ? <div className='error'>Email/password combination invalid</div> : null
+              }
               <Button
                 className="modalButton"
                 type="submit"
@@ -257,7 +301,7 @@ class Header extends Component {
           </Modal.Header>
           <Modal.Body>
             <p> Would you like to logout?</p>
-            <Button className="modalButton" bsStyle="primary" onClick={this.logoutUser}>Logout</Button>
+            <Button href="/" className="modalButton" bsStyle="primary" onClick={this.logoutUser}>Logout</Button>
             <Button className="modalButton" onClick={this.closeLogout}>Cancel</Button>
 
           </Modal.Body>
